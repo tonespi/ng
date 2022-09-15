@@ -1,0 +1,9 @@
+{
+  "name": "js-mono",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {},
+  "workspaces": [
+    "packages/*"
+  ]
+}
