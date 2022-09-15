@@ -1,0 +1,79 @@
+FROM python:3.10-slim-bullseye as poetry-base
+
+RUN apt-get update && apt-get install -y curl
+
+# https://python-poetry.org/docs/master/#installation
+ENV POETRY_VERSION=1.2.0
+
+RUN curl -sSL https://install.python-poetry.org | python3 - --version "$POETRY_VERSION"
+
+# See "Add Poetry to your PATH" in https://python-poetry.org/docs/master/#installing-with-the-official-installer
+ENV PATH="/root/.local/bin:$PATH"
+
+###########
+# BUILDER #
+###########
+
+# pull official base image
+FROM poetry-base as builder
+
+# set work directory
+WORKDIR /app
+
+# set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+COPY . .
+
+# install dependencies
+COPY ./pyproject.toml .
+COPY ./poetry.lock .
+RUN poetry build -f wheel
+
+
+#########
+# FINAL #
+#########
+
+# pull official base image
+FROM python:3.10-slim-bullseye
+
+# Used to check if postgress is running
+RUN apt-get update
+RUN apt-get install -y netcat
+
+# create directory for the app user
+RUN mkdir -p /home/app
+
+# create the app user
+RUN addgroup --system app && adduser --system app --ingroup app
+
+# create the appropriate directories
+ENV HOME=/home/app
+ENV APP_HOME=/home/app/web
+RUN mkdir $APP_HOME
+WORKDIR $APP_HOME
+
+# install dependencies
+# RUN apt-get update && apt-get install -y libpq
+COPY --from=builder /app/dist /wheels
+COPY --from=builder /app/pyproject.toml .
+RUN pip install --no-cache /wheels/*
+
+# copy entrypoint.prod.sh
+COPY ./entrypoint.prod.sh .
+RUN sed -i 's/\r$//g'  $APP_HOME/entrypoint.prod.sh
+RUN chmod +x  $APP_HOME/entrypoint.prod.sh
+
+# copy project
+COPY . $APP_HOME
+
+# chown all the files to the app user
+RUN chown -R app:app $APP_HOME
+
+# change to the app user
+# USER app
+
+# run entrypoint.prod.sh
+ENTRYPOINT ["/home/app/web/entrypoint.prod.sh"]
