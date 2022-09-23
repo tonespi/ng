@@ -4,5 +4,6 @@
     "printWidth": 80,
     "editor.formatOnSave": true,
     "tabWidth": 4,
-    "useTabs": false
+    "useTabs": false,
+    "trailingComma": "es5"
   }
